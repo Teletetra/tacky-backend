@@ -1,0 +1,58 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root, [data-theme="white"] {
+  --bg-primary: #f9fafb;
+  --bg-secondary: #f3f4f6;
+  --border-color: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --accent-color: #378ADD;
+  --accent-hover: #256cb5;
+  --card-bg: #ffffff;
+  --input-bg: #ffffff;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0b0f19;
+  --bg-secondary: #161f30;
+  --border-color: #243049;
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --accent-color: #3b82f6;
+  --accent-hover: #60a5fa;
+  --card-bg: #111a2e;
+  --input-bg: #0b0f19;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="purple"] {
+  --bg-primary: #12091f;
+  --bg-secondary: #211336;
+  --border-color: #382259;
+  --text-primary: #f5efff;
+  --text-secondary: #b39ddb;
+  --accent-color: #a855f7;
+  --accent-hover: #c084fc;
+  --card-bg: #1a0e2b;
+  --input-bg: #12091f;
+  --shadow-sm: 0 1px 2px 0 rgba(168, 85, 247, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(168, 85, 247, 0.25), 0 2px 4px -1px rgba(168, 85, 247, 0.15);
+  --shadow-lg: 0 10px 15px -3px rgba(168, 85, 247, 0.3), 0 4px 6px -2px rgba(168, 85, 247, 0.2);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+main { min-height: calc(100vh - 56px); }
+
+input, select, button { font-family: inherit; }

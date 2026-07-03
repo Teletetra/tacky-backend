@@ -1,0 +1,277 @@
+.page { padding: 1.25rem 1.5rem; max-width: 860px; margin: 0 auto; }
+
+.filtersCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.searchRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.searchInput {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 13px;
+  outline: none;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.searchInput:focus {
+  border-color: var(--accent-color);
+}
+
+.recurringToggleBtn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.recurringToggleBtn:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.recurringToggleBtn.hasItems {
+  color: var(--accent-color);
+}
+
+.filterOptions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filterLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.select {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.select:focus {
+  border-color: var(--accent-color);
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #10b981;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  z-index: 1001;
+  animation: slideUpToast 0.3s ease-out;
+}
+
+.recurringPanel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  animation: slideDown 0.2s ease-out;
+}
+
+.recurringPanelHeader {
+  margin-bottom: 12px;
+}
+
+.recurringPanelTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.recurringPanelSub {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.noRecurringText {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  font-style: italic;
+  padding: 10px 0;
+}
+
+.recurringList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recurringRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.recurringInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recurringDesc {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.recurringMeta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.recurringActionGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.incomeAmt {
+  font-size: 13px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.expenseAmt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.postBtn {
+  background: var(--accent-color);
+  color: #ffffff;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.postBtn:hover {
+  background: var(--accent-hover);
+}
+
+.totalBar {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  padding: 10px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.totalItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.totalLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.totalValIncome { font-size: 14px; font-weight: 700; color: #10b981; }
+.totalValExpense { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.totalValNet { font-size: 14px; font-weight: 700; }
+
+.netPositive { color: #10b981; }
+.netNegative { color: #f43f5e; }
+
+.group { margin-bottom: 1rem; }
+
+.dateHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+
+.dayTotal { font-weight: 600; }
+.dayNetPositive { color: #10b981; }
+.dayNetNegative { color: var(--text-secondary); }
+
+.emptyState {
+  text-align: center;
+  padding: 2.5rem 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-style: italic;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUpToast {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
