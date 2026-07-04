@@ -3,7 +3,7 @@ import { initialExpenses, CATEGORIES } from '../data/initialExpenses';
 
 const ExpenseContext = createContext(null);
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:10000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
 
 function reducer(state, action) {
   switch (action.type) {

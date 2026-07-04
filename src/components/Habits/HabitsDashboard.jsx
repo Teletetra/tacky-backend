@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styles from './HabitsDashboard.module.css';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:10000/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
 
 const getLocalDateString = (dateObj = new Date()) => {
   const tzOffset = dateObj.getTimezoneOffset() * 60000;
