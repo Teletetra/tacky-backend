@@ -128,13 +128,20 @@ export default function AddExpense() {
               </button>
             </div>
             {!showCustomCat && (
-              <select className={styles.input} value={form.cat} onChange={set('cat')}>
-                {filteredCategories.map(([key, { label, icon }]) => (
-                  <option key={key} value={key}>
-                    {icon} {label}
-                  </option>
+              <div className={styles.categoryGrid}>
+                {filteredCategories.map(([key, { label, icon, color }]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`${styles.categoryCard} ${form.cat === key ? styles.categoryCardActive : ''}`}
+                    style={{ '--cat-color': color }}
+                    onClick={() => setForm(f => ({ ...f, cat: key }))}
+                  >
+                    <span className={styles.categoryIcon}>{icon}</span>
+                    <span className={styles.categoryLabel}>{label}</span>
+                  </button>
                 ))}
-              </select>
+              </div>
             )}
           </div>
         </div>

@@ -1,4 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  LineChart, 
+  Line 
+} from 'recharts';
 import styles from './HabitsDashboard.module.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
@@ -21,6 +31,10 @@ export default function HabitsDashboard() {
   const [habits, setHabits] = useState([]);
   const [filterCategory, setFilterCategory] = useState('all');
   const [statusText, setStatusText] = useState('Connecting...');
+  
+  // View Toggle ('list' or 'analytics')
+  const [activeView, setActiveView] = useState('list');
+  const [analyticsData, setAnalyticsData] = useState(null);
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -51,11 +65,29 @@ export default function HabitsDashboard() {
     }
   }, [selectedDate]);
 
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/habits/analytics?local_date=${selectedDate}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAnalyticsData(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, [selectedDate]);
+
   useEffect(() => {
     fetchHabits();
-    const interval = setInterval(fetchHabits, 60000); // refresh every minute
+    const interval = setInterval(fetchHabits, 60000);
     return () => clearInterval(interval);
   }, [fetchHabits]);
+
+  useEffect(() => {
+    if (activeView === 'analytics') {
+      fetchAnalytics();
+    }
+  }, [activeView, fetchAnalytics]);
 
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
@@ -74,6 +106,7 @@ export default function HabitsDashboard() {
     try {
       await fetch(`${API_BASE}/habits/${habitId}`, { method: 'DELETE' });
       fetchHabits();
+      if (activeView === 'analytics') fetchAnalytics();
     } catch (err) {
       console.error(err);
     }
@@ -104,6 +137,10 @@ export default function HabitsDashboard() {
     ? habits 
     : habits.filter(h => h.category === filterCategory);
 
+  const filteredAnalytics = filterCategory === 'all'
+    ? analyticsData?.habit_analytics
+    : analyticsData?.habit_analytics.filter(h => h.category === filterCategory);
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -117,31 +154,52 @@ export default function HabitsDashboard() {
           />
           <button onClick={handleNextDay} className={styles.navBtn}>▶</button>
         </div>
+        
+        {/* Toggle segmented controls for view mode */}
+        <div className={styles.viewToggle}>
+          <button 
+            className={`${styles.toggleBtn} ${activeView === 'list' ? styles.activeToggle : ''}`}
+            onClick={() => setActiveView('list')}
+          >
+            📋 List View
+          </button>
+          <button 
+            className={`${styles.toggleBtn} ${activeView === 'analytics' ? styles.activeToggle : ''}`}
+            onClick={() => setActiveView('analytics')}
+          >
+            📊 Analytics
+          </button>
+        </div>
+
         <div className={`${styles.status} ${statusText === 'Connected' ? styles.statusOk : styles.statusErr}`}>
           <span className={styles.statusDot}></span>
           {statusText}
         </div>
       </header>
 
-      <section className={styles.statsRow}>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Active Habits</div>
-          <div className={styles.statValue}>{totalHabits}</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Completed Today</div>
-          <div className={styles.statValue}>{completedToday} / {totalHabits}</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Max Streak</div>
-          <div className={styles.statValue}>{maxStreakAll} <span className={styles.flame}>🔥</span></div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Consistency</div>
-          <div className={styles.statValue}>{consistency}%</div>
-        </div>
-      </section>
+      {/* Daily Metrics Panel (Hidden in Analytics View to focus on historical graphs) */}
+      {activeView === 'list' && (
+        <section className={styles.statsRow}>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Active Habits</div>
+            <div className={styles.statValue}>{totalHabits}</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Completed Today</div>
+            <div className={styles.statValue}>{completedToday} / {totalHabits}</div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Max Streak</div>
+            <div className={styles.statValue}>{maxStreakAll} <span className={styles.flame}>🔥</span></div>
+          </div>
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Consistency</div>
+            <div className={styles.statValue}>{consistency}%</div>
+          </div>
+        </section>
+      )}
 
+      {/* Category filter buttons */}
       <section className={styles.controlsRow}>
         <div className={styles.filters}>
           <button 
@@ -160,24 +218,140 @@ export default function HabitsDashboard() {
             </button>
           ))}
         </div>
-        <button className={styles.addBtn} onClick={() => setShowAddModal(true)}>➕ Add Habit</button>
-      </section>
-
-      <section className={styles.grid}>
-        {filteredHabits.length === 0 ? (
-          <div className={styles.emptyState}>No habits found for this filter. Start by adding one!</div>
-        ) : (
-          filteredHabits.map(habit => (
-            <HabitCard 
-              key={habit.id} 
-              habit={habit}
-              onCheckIn={() => { setSelectedHabit(habit); setShowCheckinModal(true); }}
-              onHistory={() => openHistory(habit)}
-              onDelete={() => handleDeleteHabit(habit.id, habit.name)}
-            />
-          ))
+        {activeView === 'list' && (
+          <button className={styles.addBtn} onClick={() => setShowAddModal(true)}>➕ Add Habit</button>
         )}
       </section>
+
+      {/* Content Rendering based on View State */}
+      {activeView === 'list' ? (
+        <section className={styles.grid}>
+          {filteredHabits.length === 0 ? (
+            <div className={styles.emptyState}>No habits found for this filter. Start by adding one!</div>
+          ) : (
+            filteredHabits.map(habit => (
+              <HabitCard 
+                key={habit.id} 
+                habit={habit}
+                onCheckIn={() => { setSelectedHabit(habit); setShowCheckinModal(true); }}
+                onHistory={() => openHistory(habit)}
+                onDelete={() => handleDeleteHabit(habit.id, habit.name)}
+              />
+            ))
+          )}
+        </section>
+      ) : (
+        <section className={styles.analyticsSection}>
+          {/* Global Completion Area Chart */}
+          <div className={styles.globalChartCard}>
+            <h3 className={styles.chartTitle}>Overall Habit Completion Trend (Past 30 Days)</h3>
+            <div className={styles.chartWrapper}>
+              {analyticsData?.daily_completions ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={analyticsData.daily_completions}>
+                    <defs>
+                      <linearGradient id="colorCompletions" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--accent-color)" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="var(--accent-color)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={d => d.slice(8, 10)} 
+                      stroke="var(--text-secondary)" 
+                      fontSize={11}
+                    />
+                    <YAxis stroke="var(--text-secondary)" fontSize={11} allowDecimals={false} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        background: 'var(--bg-secondary)', 
+                        border: '1px solid var(--border-color)', 
+                        borderRadius: '10px', 
+                        color: 'var(--text-primary)' 
+                      }} 
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="completed" 
+                      name="Habits Completed"
+                      stroke="var(--accent-color)" 
+                      fillOpacity={1} 
+                      fill="url(#colorCompletions)" 
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className={styles.chartLoading}>Loading historical trends...</div>
+              )}
+            </div>
+          </div>
+
+          {/* Individual Habit Analytics Cards */}
+          <h3 className={styles.analyticsSectionHeading}>Habit Analytics breakdown</h3>
+          <div className={styles.analyticsGrid}>
+            {!filteredAnalytics ? (
+              <div className={styles.chartLoading}>Loading habit metrics...</div>
+            ) : filteredAnalytics.length === 0 ? (
+              <div className={styles.emptyState}>No habits found.</div>
+            ) : (
+              filteredAnalytics.map(habit => (
+                <div key={habit.id} className={styles.analyticsCard}>
+                  <div className={styles.analyticsCardHeader}>
+                    <h4 className={styles.analyticsCardTitle}>{habit.name}</h4>
+                    <span className={styles.badge}>{CATEGORY_ICONS[habit.category]} {habit.category}</span>
+                  </div>
+
+                  <div className={styles.analyticsMetricsRow}>
+                    <div className={styles.analyticsMetricItem}>
+                      <span className={styles.metricLbl}>Weekly Rate (7d)</span>
+                      <span className={styles.metricVal}>{habit.weekly_rate}%</span>
+                    </div>
+                    <div className={styles.analyticsMetricItem}>
+                      <span className={styles.metricLbl}>Monthly Rate (30d)</span>
+                      <span className={styles.metricVal}>{habit.monthly_rate}%</span>
+                    </div>
+                    <div className={styles.analyticsMetricItem}>
+                      <span className={styles.metricLbl}>Total Check-ins</span>
+                      <span className={styles.metricVal}>{habit.total_completions}</span>
+                    </div>
+                  </div>
+
+                  {/* Sparkline Graph representing latest checkin points */}
+                  <div className={styles.sparklineSection}>
+                    <div className={styles.sparklineHeader}>
+                      <span>Progress Sparkline (Last 15 days)</span>
+                      <span>Streak: {habit.current_streak} 🔥</span>
+                    </div>
+                    <div className={styles.sparklineChartWrapper}>
+                      <ResponsiveContainer width="100%" height={50}>
+                        <LineChart data={habit.history}>
+                          <Line 
+                            type="monotone" 
+                            dataKey="value" 
+                            stroke="var(--accent-color)" 
+                            strokeWidth={2} 
+                            dot={false}
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              background: 'var(--bg-secondary)', 
+                              border: '1px solid var(--border-color)',
+                              fontSize: '11px',
+                              borderRadius: '8px'
+                            }}
+                            labelFormatter={(label, items) => items[0]?.payload?.date || ''}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Modals */}
       {showAddModal && <AddHabitModal onClose={() => setShowAddModal(false)} onRefresh={fetchHabits} />}

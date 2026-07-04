@@ -120,6 +120,99 @@ async def get_habits(local_date: Optional[str] = Query(None, description="The us
         
     return habits
 
+@app.get("/api/habits/analytics")
+async def get_habits_analytics(local_date: Optional[str] = Query(None, description="The user's local date in YYYY-MM-DD format")):
+    from datetime import timedelta
+    if not local_date:
+        local_date = date.today().isoformat()
+        
+    try:
+        current_date = datetime.strptime(local_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid local_date format. Use YYYY-MM-DD.")
+
+    habits = []
+    cursor = habits_collection.find()
+    async for habit_doc in cursor:
+        habit_doc["id"] = habit_doc["_id"]
+        habits.append(habit_doc)
+
+    # 30 days global completions history
+    start_date_30 = current_date - timedelta(days=29)
+    daily_completions = {}
+    for i in range(30):
+        d = start_date_30 + timedelta(days=i)
+        daily_completions[d.isoformat()] = {"date": d.isoformat(), "completed": 0, "total": 0}
+
+    for habit in habits:
+        logs_cursor = logs_collection.find({"habit_id": habit["id"]})
+        async for log in logs_cursor:
+            log_date = log["date"]
+            if log_date in daily_completions:
+                daily_completions[log_date]["total"] += 1
+                if log["status"]:
+                    daily_completions[log_date]["completed"] += 1
+
+    daily_completions_list = sorted(list(daily_completions.values()), key=lambda x: x["date"])
+
+    habit_analytics = []
+    for habit in habits:
+        habit_id = habit["id"]
+        logs = []
+        logs_cursor = logs_collection.find({"habit_id": habit_id}).sort("date", 1)
+        async for log in logs_cursor:
+            log["id"] = log["_id"]
+            logs.append(log)
+
+        total_completions = sum(1 for l in logs if l["status"])
+        
+        last_7_days = [(current_date - timedelta(days=i)).isoformat() for i in range(7)]
+        last_30_days = [(current_date - timedelta(days=i)).isoformat() for i in range(30)]
+        
+        weekly_completions = sum(1 for l in logs if l["date"] in last_7_days and l["status"])
+        monthly_completions = sum(1 for l in logs if l["date"] in last_30_days and l["status"])
+        
+        weekly_rate = int((weekly_completions / 7) * 100) if len(logs) > 0 else 0
+        monthly_rate = int((monthly_completions / 30) * 100) if len(logs) > 0 else 0
+        
+        history_points = []
+        for l in logs[-15:]:
+            val = 0
+            if habit["tracking_type"] == "workout":
+                val = l.get("weight") or 0.0
+            elif habit["tracking_type"] == "timer":
+                val = l.get("time_spent_minutes") or 0
+            elif habit["tracking_type"] == "counter":
+                val = l.get("chapter") or 0
+            elif habit["tracking_type"] == "negative":
+                val = l.get("negative_count") or 0
+            else:
+                val = 1 if l["status"] else 0
+                
+            history_points.append({
+                "date": l["date"],
+                "value": val,
+                "status": l["status"]
+            })
+
+        habit_analytics.append({
+            "id": habit_id,
+            "name": habit["name"],
+            "category": habit["category"],
+            "tracking_type": habit["tracking_type"],
+            "current_streak": habit.get("current_streak", 0),
+            "longest_streak": habit.get("longest_streak", 0),
+            "weekly_rate": weekly_rate,
+            "monthly_rate": monthly_rate,
+            "total_completions": total_completions,
+            "history": history_points
+        })
+
+    return {
+        "daily_completions": daily_completions_list,
+        "habit_analytics": habit_analytics
+    }
+
 @app.post("/api/habits", status_code=status.HTTP_201_CREATED)
 async def create_habit(habit: HabitCreate):
     habit_id = str(uuid.uuid4())
