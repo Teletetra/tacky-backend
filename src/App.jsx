@@ -11,10 +11,10 @@ import './App.css';
 function PageRouter() {
   const { activeTab } = useExpenses();
   if (activeTab === 'dashboard') return <Dashboard />;
-  if (activeTab === 'expenses')  return <Expenses />;
-  if (activeTab === 'debts')     return <Debts />;
-  if (activeTab === 'add')       return <AddExpense />;
-  if (activeTab === 'habits')    return <HabitsDashboard />;
+  if (activeTab === 'expenses') return <Expenses />;
+  if (activeTab === 'debts') return <Debts />;
+  if (activeTab === 'add') return <AddExpense />;
+  if (activeTab === 'habits') return <HabitsDashboard />;
   return null;
 }
 
@@ -42,3 +42,4 @@ export default function App() {
     </ExpenseProvider>
   );
 }
+// sj
