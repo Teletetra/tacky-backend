@@ -12,7 +12,10 @@ import {
 import styles from './HabitsDashboard.module.css';
 import { apiFetch } from '../../utils/auth';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
+let API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
+if (API_BASE && !API_BASE.endsWith('/api')) {
+  API_BASE = API_BASE.replace(/\/$/, '') + '/api';
+}
 
 const getLocalDateString = (dateObj = new Date()) => {
   const tzOffset = dateObj.getTimezoneOffset() * 60000;

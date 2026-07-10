@@ -6,12 +6,12 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+.env.template
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
+backup_db.py
 # C extensions
 *.so
 

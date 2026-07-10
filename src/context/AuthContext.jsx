@@ -2,7 +2,10 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { apiFetch, setAuthTokens, clearAuthTokens } from '../utils/auth';
 
 const AuthContext = createContext(null);
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
+let API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
+if (API_BASE && !API_BASE.endsWith('/api')) {
+  API_BASE = API_BASE.replace(/\/$/, '') + '/api';
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
