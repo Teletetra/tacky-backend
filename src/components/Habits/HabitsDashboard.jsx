@@ -10,6 +10,7 @@ import {
   Line 
 } from 'recharts';
 import styles from './HabitsDashboard.module.css';
+import { apiFetch } from '../../utils/auth';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:10000/api';
 
@@ -51,7 +52,7 @@ export default function HabitsDashboard() {
 
   const fetchHabits = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/habits?local_date=${selectedDate}`);
+      const res = await apiFetch(`${API_BASE}/habits?local_date=${selectedDate}`);
       if (res.ok) {
         const data = await res.json();
         setHabits(data);
@@ -67,7 +68,7 @@ export default function HabitsDashboard() {
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/habits/analytics?local_date=${selectedDate}`);
+      const res = await apiFetch(`${API_BASE}/habits/analytics?local_date=${selectedDate}`);
       if (res.ok) {
         const data = await res.json();
         setAnalyticsData(data);
@@ -104,7 +105,7 @@ export default function HabitsDashboard() {
   const handleDeleteHabit = async (habitId, name) => {
     if (!window.confirm(`Delete habit "${name}" and all its history?`)) return;
     try {
-      await fetch(`${API_BASE}/habits/${habitId}`, { method: 'DELETE' });
+      await apiFetch(`${API_BASE}/habits/${habitId}`, { method: 'DELETE' });
       fetchHabits();
       if (activeView === 'analytics') fetchAnalytics();
     } catch (err) {
@@ -118,7 +119,7 @@ export default function HabitsDashboard() {
     setCalendarYear(new Date().getFullYear());
     setSelectedCalendarDateStr(null);
     try {
-      const res = await fetch(`${API_BASE}/habits/${habit.id}/logs`);
+      const res = await apiFetch(`${API_BASE}/habits/${habit.id}/logs`);
       if (res.ok) {
         setHistoryLogs(await res.json());
         setShowHistoryModal(true);
@@ -448,13 +449,13 @@ function AddHabitModal({ onClose, onRefresh }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE}/habits`, {
+      const res = await apiFetch(`${API_BASE}/habits`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           name, category, target_frequency: frequency, tracking_type: trackingType,
           target_time_spent: targetTime ? parseInt(targetTime) : null
-        })
+        }
       });
       if (res.ok) {
         onRefresh();
@@ -540,16 +541,16 @@ function CheckInModal({ habit, date, onClose, onRefresh }) {
     else if (habit.tracking_type === 'counter') finalStatus = (parseInt(chapter) > 0);
 
     try {
-      const res = await fetch(`${API_BASE}/habits/${habit.id}/checkin`, {
+      const res = await apiFetch(`${API_BASE}/habits/${habit.id}/checkin`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: {
           habit_id: habit.id, date: date, status: finalStatus, notes,
           negative_count: parseInt(negativeCount) || null,
           time_spent_minutes: parseInt(timeSpent) || null,
           weight: parseFloat(weight) || null, reps: parseInt(reps) || null,
           chapter: parseInt(chapter) || null
-        })
+        }
       });
       if (res.ok) {
         onRefresh();

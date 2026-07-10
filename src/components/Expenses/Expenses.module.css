@@ -275,3 +275,35 @@
   from { opacity: 0; transform: translate(-50%, 20px); }
   to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+@media (max-width: 580px) {
+  .page {
+    padding: 0.75rem 1rem;
+  }
+  .filtersCard {
+    padding: 0.75rem;
+  }
+  .searchRow {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .recurringToggleBtn {
+    width: 100%;
+    text-align: center;
+  }
+  .filterOptions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .totalBar {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+  .totalItem {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    padding: 2px 4px;
+  }
+}

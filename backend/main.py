@@ -1,7 +1,7 @@
 import os
 import uuid
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
@@ -9,12 +9,21 @@ from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
-from database import habits_collection, logs_collection, expenses_collection, debts_collection, check_db_connection
+from database import (
+    habits_collection, logs_collection, expenses_collection, debts_collection,
+    users_collection, refresh_tokens_collection, check_db_connection
+)
 from models import (
     HabitCreate, HabitUpdate, HabitInDB,
     DailyLogCreate, DailyLogInDB,
-    ExpenseCreate, DebtCreate
+    ExpenseCreate, DebtCreate,
+    UserCreate, UserLogin, UserResponse, TokenRefreshRequest
 )
+from auth_utils import (
+    hash_password, verify_password,
+    create_access_token, create_refresh_token, verify_jwt, get_current_user
+)
+from fastapi import Depends
 from scheduler import start_scheduler, reset_expired_streaks
 
 # Setup Logger
@@ -65,8 +74,133 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat()
     }
 
+# --- AUTHENTICATION ROUTES ---
+
+@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
+async def register_user(user_in: UserCreate):
+    existing_user = await users_collection.find_one({"username": user_in.username})
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    # Check if first user
+    first_user_check = await users_collection.find_one()
+    is_first_user = first_user_check is None
+    
+    user_id = str(uuid.uuid4())
+    hashed_pass, salt = hash_password(user_in.password)
+    
+    user_doc = {
+        "_id": user_id,
+        "username": user_in.username,
+        "hashed_password": hashed_pass,
+        "salt": salt,
+        "created_at": datetime.utcnow()
+    }
+    
+    await users_collection.insert_one(user_doc)
+    
+    # Migrate owner-less data to first registered user
+    if is_first_user:
+        logger.info(f"First user registered. Auto-migrating owner-less documents to user: {user_id}")
+        await habits_collection.update_many({"user_id": {"$exists": False}}, {"$set": {"user_id": user_id}})
+        await logs_collection.update_many({"user_id": {"$exists": False}}, {"$set": {"user_id": user_id}})
+        await expenses_collection.update_many({"user_id": {"$exists": False}}, {"$set": {"user_id": user_id}})
+        await debts_collection.update_many({"user_id": {"$exists": False}}, {"$set": {"user_id": user_id}})
+        
+    return {
+        "id": user_id,
+        "username": user_in.username,
+        "created_at": user_doc["created_at"]
+    }
+
+@app.post("/api/auth/login")
+async def login_user(user_in: UserLogin):
+    user = await users_collection.find_one({"username": user_in.username})
+    if not user or not verify_password(user_in.password, user["hashed_password"], user["salt"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect username or password"
+        )
+        
+    user_id = user["_id"]
+    access_token = create_access_token(user_id)
+    refresh_token = create_refresh_token(user_id)
+    
+    # Track refresh token (valid for 7 days)
+    expires_at = datetime.utcnow() + timedelta(days=7)
+    await refresh_tokens_collection.replace_one(
+        {"user_id": user_id},
+        {
+            "user_id": user_id,
+            "token": refresh_token,
+            "expires_at": expires_at
+        },
+        upsert=True
+    )
+    
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "username": user["username"]
+    }
+
+@app.post("/api/auth/refresh")
+async def refresh_access_token(req: TokenRefreshRequest):
+    token = req.refresh_token
+    payload = verify_jwt(token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+        
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token payload"
+        )
+        
+    stored_token = await refresh_tokens_collection.find_one({
+        "user_id": user_id,
+        "token": token
+    })
+    if not stored_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked or expired"
+        )
+        
+    new_access_token = create_access_token(user_id)
+    
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer"
+    }
+
+@app.post("/api/auth/logout")
+async def logout_user(current_user: dict = Depends(get_current_user)):
+    await refresh_tokens_collection.delete_one({"user_id": current_user["_id"]})
+    return {"message": "Successfully logged out"}
+
+@app.get("/api/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    return {
+        "id": current_user["_id"],
+        "username": current_user["username"],
+        "created_at": current_user["created_at"]
+    }
+
+
 @app.get("/api/habits")
-async def get_habits(local_date: Optional[str] = Query(None, description="The user's local date in YYYY-MM-DD format")):
+async def get_habits(
+    local_date: Optional[str] = Query(None, description="The user's local date in YYYY-MM-DD format"),
+    current_user: dict = Depends(get_current_user)
+):
     if not local_date:
         local_date = date.today().isoformat()
         
@@ -76,7 +210,7 @@ async def get_habits(local_date: Optional[str] = Query(None, description="The us
         raise HTTPException(status_code=400, detail="Invalid local_date format. Use YYYY-MM-DD.")
         
     habits = []
-    cursor = habits_collection.find()
+    cursor = habits_collection.find({"user_id": current_user["_id"]})
     async for habit_doc in cursor:
         habit_id = habit_doc["_id"]
         
@@ -97,7 +231,7 @@ async def get_habits(local_date: Optional[str] = Query(None, description="The us
                     # Streak is broken, update it to 0
                     habit_doc["current_streak"] = 0
                     await habits_collection.update_one(
-                        {"_id": habit_id},
+                        {"_id": habit_id, "user_id": current_user["_id"]},
                         {"$set": {"current_streak": 0}}
                     )
             except Exception as e:
@@ -105,6 +239,7 @@ async def get_habits(local_date: Optional[str] = Query(None, description="The us
                 
         # Check if checked in for the requested date (local_date)
         log_today = await logs_collection.find_one({
+            "user_id": current_user["_id"],
             "habit_id": habit_id,
             "date": local_date
         })
@@ -121,7 +256,10 @@ async def get_habits(local_date: Optional[str] = Query(None, description="The us
     return habits
 
 @app.get("/api/habits/analytics")
-async def get_habits_analytics(local_date: Optional[str] = Query(None, description="The user's local date in YYYY-MM-DD format")):
+async def get_habits_analytics(
+    local_date: Optional[str] = Query(None, description="The user's local date in YYYY-MM-DD format"),
+    current_user: dict = Depends(get_current_user)
+):
     from datetime import timedelta
     if not local_date:
         local_date = date.today().isoformat()
@@ -132,7 +270,7 @@ async def get_habits_analytics(local_date: Optional[str] = Query(None, descripti
         raise HTTPException(status_code=400, detail="Invalid local_date format. Use YYYY-MM-DD.")
 
     habits = []
-    cursor = habits_collection.find()
+    cursor = habits_collection.find({"user_id": current_user["_id"]})
     async for habit_doc in cursor:
         habit_doc["id"] = habit_doc["_id"]
         habits.append(habit_doc)
@@ -145,7 +283,7 @@ async def get_habits_analytics(local_date: Optional[str] = Query(None, descripti
         daily_completions[d.isoformat()] = {"date": d.isoformat(), "completed": 0, "total": 0}
 
     for habit in habits:
-        logs_cursor = logs_collection.find({"habit_id": habit["id"]})
+        logs_cursor = logs_collection.find({"user_id": current_user["_id"], "habit_id": habit["id"]})
         async for log in logs_cursor:
             log_date = log["date"]
             if log_date in daily_completions:
@@ -159,7 +297,7 @@ async def get_habits_analytics(local_date: Optional[str] = Query(None, descripti
     for habit in habits:
         habit_id = habit["id"]
         logs = []
-        logs_cursor = logs_collection.find({"habit_id": habit_id}).sort("date", 1)
+        logs_cursor = logs_collection.find({"user_id": current_user["_id"], "habit_id": habit_id}).sort("date", 1)
         async for log in logs_cursor:
             log["id"] = log["_id"]
             logs.append(log)
@@ -214,10 +352,11 @@ async def get_habits_analytics(local_date: Optional[str] = Query(None, descripti
     }
 
 @app.post("/api/habits", status_code=status.HTTP_201_CREATED)
-async def create_habit(habit: HabitCreate):
+async def create_habit(habit: HabitCreate, current_user: dict = Depends(get_current_user)):
     habit_id = str(uuid.uuid4())
     habit_doc = habit.dict()
     habit_doc["_id"] = habit_id
+    habit_doc["user_id"] = current_user["_id"]
     habit_doc["current_streak"] = 0
     habit_doc["longest_streak"] = 0
     habit_doc["last_checkin"] = None
@@ -233,8 +372,8 @@ async def create_habit(habit: HabitCreate):
     return habit_doc
 
 @app.put("/api/habits/{habit_id}/checkin")
-async def checkin_habit(habit_id: str, log_data: DailyLogCreate):
-    habit = await habits_collection.find_one({"_id": habit_id})
+async def checkin_habit(habit_id: str, log_data: DailyLogCreate, current_user: dict = Depends(get_current_user)):
+    habit = await habits_collection.find_one({"_id": habit_id, "user_id": current_user["_id"]})
     if not habit:
         raise HTTPException(status_code=404, detail="Habit not found")
         
@@ -302,7 +441,7 @@ async def checkin_habit(habit_id: str, log_data: DailyLogCreate):
         update_fields["current_chapter"] = log_data.chapter
         
     await habits_collection.update_one(
-        {"_id": habit_id},
+        {"_id": habit_id, "user_id": current_user["_id"]},
         {"$set": update_fields}
     )
     
@@ -310,6 +449,7 @@ async def checkin_habit(habit_id: str, log_data: DailyLogCreate):
     log_id = f"{habit_id}_{log_date_str}"
     log_doc = {
         "_id": log_id,
+        "user_id": current_user["_id"],
         "habit_id": habit_id,
         "date": log_date_str,
         "status": status_completed,
@@ -323,12 +463,12 @@ async def checkin_habit(habit_id: str, log_data: DailyLogCreate):
     }
     
     await logs_collection.replace_one(
-        {"_id": log_id},
+        {"_id": log_id, "user_id": current_user["_id"]},
         log_doc,
         upsert=True
     )
     
-    updated_habit = await habits_collection.find_one({"_id": habit_id})
+    updated_habit = await habits_collection.find_one({"_id": habit_id, "user_id": current_user["_id"]})
     updated_habit["id"] = updated_habit["_id"]
     return {
         "habit": updated_habit,
@@ -336,19 +476,24 @@ async def checkin_habit(habit_id: str, log_data: DailyLogCreate):
     }
 
 @app.delete("/api/habits/{habit_id}")
-async def delete_habit(habit_id: str):
-    res = await habits_collection.delete_one({"_id": habit_id})
+async def delete_habit(habit_id: str, current_user: dict = Depends(get_current_user)):
+    res = await habits_collection.delete_one({"_id": habit_id, "user_id": current_user["_id"]})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Habit not found")
         
-    # Cascade delete all logs associated with this habit
-    await logs_collection.delete_many({"habit_id": habit_id})
+    # Cascade delete all logs associated with this habit for this user
+    await logs_collection.delete_many({"user_id": current_user["_id"], "habit_id": habit_id})
     return {"message": "Habit and associated logs deleted successfully"}
 
 @app.get("/api/habits/{habit_id}/logs")
-async def get_habit_logs(habit_id: str):
+async def get_habit_logs(habit_id: str, current_user: dict = Depends(get_current_user)):
+    # Verify ownership of habit first
+    habit = await habits_collection.find_one({"_id": habit_id, "user_id": current_user["_id"]})
+    if not habit:
+        raise HTTPException(status_code=404, detail="Habit not found")
+        
     logs = []
-    cursor = logs_collection.find({"habit_id": habit_id}).sort("date", -1)
+    cursor = logs_collection.find({"user_id": current_user["_id"], "habit_id": habit_id}).sort("date", -1)
     async for log in cursor:
         log["id"] = log["_id"]
         logs.append(log)
@@ -372,70 +517,74 @@ async def trigger_scheduler(target_date: Optional[str] = Query(None, description
 
 # --- EXPENSE ROUTES ---
 @app.get("/api/expenses")
-async def get_expenses():
+async def get_expenses(current_user: dict = Depends(get_current_user)):
     expenses = []
-    cursor = expenses_collection.find()
+    cursor = expenses_collection.find({"user_id": current_user["_id"]})
     async for doc in cursor:
         doc["id"] = doc.pop("_id")
         expenses.append(doc)
     return expenses
 
 @app.post("/api/expenses", status_code=status.HTTP_201_CREATED)
-async def create_expense(expense: ExpenseCreate):
+async def create_expense(expense: ExpenseCreate, current_user: dict = Depends(get_current_user)):
     expense_id = str(uuid.uuid4())
     doc = expense.dict()
     doc["_id"] = expense_id
+    doc["user_id"] = current_user["_id"]
     await expenses_collection.insert_one(doc)
     doc["id"] = expense_id
     return doc
 
 @app.put("/api/expenses/{expense_id}")
-async def update_expense(expense_id: str, expense: ExpenseCreate):
+async def update_expense(expense_id: str, expense: ExpenseCreate, current_user: dict = Depends(get_current_user)):
     doc = expense.dict()
-    res = await expenses_collection.update_one({"_id": expense_id}, {"$set": doc})
+    doc["user_id"] = current_user["_id"]
+    res = await expenses_collection.update_one({"_id": expense_id, "user_id": current_user["_id"]}, {"$set": doc})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Expense not found")
     doc["id"] = expense_id
     return doc
 
 @app.delete("/api/expenses/{expense_id}")
-async def delete_expense(expense_id: str):
-    res = await expenses_collection.delete_one({"_id": expense_id})
+async def delete_expense(expense_id: str, current_user: dict = Depends(get_current_user)):
+    res = await expenses_collection.delete_one({"_id": expense_id, "user_id": current_user["_id"]})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Expense not found")
     return {"message": "Expense deleted successfully"}
 
 # --- DEBT ROUTES ---
 @app.get("/api/debts")
-async def get_debts():
+async def get_debts(current_user: dict = Depends(get_current_user)):
     debts = []
-    cursor = debts_collection.find()
+    cursor = debts_collection.find({"user_id": current_user["_id"]})
     async for doc in cursor:
         doc["id"] = doc.pop("_id")
         debts.append(doc)
     return debts
 
 @app.post("/api/debts", status_code=status.HTTP_201_CREATED)
-async def create_debt(debt: DebtCreate):
+async def create_debt(debt: DebtCreate, current_user: dict = Depends(get_current_user)):
     debt_id = str(uuid.uuid4())
     doc = debt.dict()
     doc["_id"] = debt_id
+    doc["user_id"] = current_user["_id"]
     await debts_collection.insert_one(doc)
     doc["id"] = debt_id
     return doc
 
 @app.put("/api/debts/{debt_id}")
-async def update_debt(debt_id: str, debt: DebtCreate):
+async def update_debt(debt_id: str, debt: DebtCreate, current_user: dict = Depends(get_current_user)):
     doc = debt.dict()
-    res = await debts_collection.update_one({"_id": debt_id}, {"$set": doc})
+    doc["user_id"] = current_user["_id"]
+    res = await debts_collection.update_one({"_id": debt_id, "user_id": current_user["_id"]}, {"$set": doc})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Debt not found")
     doc["id"] = debt_id
     return doc
 
 @app.delete("/api/debts/{debt_id}")
-async def delete_debt(debt_id: str):
-    res = await debts_collection.delete_one({"_id": debt_id})
+async def delete_debt(debt_id: str, current_user: dict = Depends(get_current_user)):
+    res = await debts_collection.delete_one({"_id": debt_id, "user_id": current_user["_id"]})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Debt not found")
     return {"message": "Debt deleted successfully"}

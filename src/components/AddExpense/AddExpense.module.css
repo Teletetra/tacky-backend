@@ -59,7 +59,7 @@
   margin-bottom: 1rem;
 }
 
-.field { display: flex; flex-direction: column; gap: 4px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .full { grid-column: 1 / -1; }
 
 .label {
@@ -100,6 +100,8 @@
   outline: none;
   background: var(--input-bg);
   transition: border-color 0.15s;
+  min-width: 0;
+  width: 100%;
 }
 .input:focus { border-color: var(--accent-color); }
 
@@ -306,4 +308,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+}
+
+@media (max-width: 580px) {
+  .page {
+    padding: 0.75rem 1rem;
+  }
+  .card {
+    padding: 1rem;
+  }
+  .formGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .categoryGrid {
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+    gap: 6px;
+  }
+  .categoryCard {
+    padding: 8px 2px;
+  }
+  .categoryIcon {
+    font-size: 18px;
+  }
+  .categoryLabel {
+    font-size: 9px;
+  }
 }

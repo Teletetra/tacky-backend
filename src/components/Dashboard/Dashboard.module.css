@@ -128,3 +128,14 @@
     transform: translateY(0);
   }
 }
+
+@media (max-width: 580px) {
+  .page {
+    padding: 0.75rem 1rem;
+  }
+  .chartHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

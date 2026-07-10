@@ -1,4 +1,5 @@
 import { useExpenses } from '../../context/ExpenseContext';
+import { useAuth } from '../../context/AuthContext';
 import styles from './Navbar.module.css';
 
 const TABS = [
@@ -11,6 +12,7 @@ const TABS = [
 
 export default function Navbar() {
   const { activeTab, setTab, theme, setTheme } = useExpenses();
+  const { user, logout } = useAuth();
 
   return (
     <nav className={styles.nav}>
@@ -27,31 +29,39 @@ export default function Navbar() {
           </button>
         ))}
       </div>
-      <div className={styles.themeSelector}>
-        <button
-          className={`${styles.themeBtn} ${theme === 'white' ? styles.themeActive : ''}`}
-          onClick={() => setTheme('white')}
-          title="Light Theme"
-          aria-label="Light theme"
-        >
-          ☀️
-        </button>
-        <button
-          className={`${styles.themeBtn} ${theme === 'dark' ? styles.themeActive : ''}`}
-          onClick={() => setTheme('dark')}
-          title="Dark Theme"
-          aria-label="Dark theme"
-        >
-          🌙
-        </button>
-        <button
-          className={`${styles.themeBtn} ${theme === 'purple' ? styles.themeActive : ''}`}
-          onClick={() => setTheme('purple')}
-          title="Purple Theme"
-          aria-label="Purple theme"
-        >
-          🔮
-        </button>
+      <div className={styles.rightActions}>
+        <div className={styles.userSection}>
+          <span className={styles.username}>👤 {user?.username}</span>
+          <button className={styles.logoutBtn} onClick={logout} title="Log Out" aria-label="Log out">
+            Logout
+          </button>
+        </div>
+        <div className={styles.themeSelector}>
+          <button
+            className={`${styles.themeBtn} ${theme === 'white' ? styles.themeActive : ''}`}
+            onClick={() => setTheme('white')}
+            title="Light Theme"
+            aria-label="Light theme"
+          >
+            ☀️
+          </button>
+          <button
+            className={`${styles.themeBtn} ${theme === 'dark' ? styles.themeActive : ''}`}
+            onClick={() => setTheme('dark')}
+            title="Dark Theme"
+            aria-label="Dark theme"
+          >
+            🌙
+          </button>
+          <button
+            className={`${styles.themeBtn} ${theme === 'purple' ? styles.themeActive : ''}`}
+            onClick={() => setTheme('purple')}
+            title="Purple Theme"
+            aria-label="Purple theme"
+          >
+            🔮
+          </button>
+        </div>
       </div>
     </nav>
   );

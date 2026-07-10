@@ -22,6 +22,7 @@ class TrackingType(str, Enum):
     COUNTER = "counter"    # Yatharth Geeta chapters read
 
 class HabitBase(BaseModel):
+    user_id: Optional[str] = None
     name: str
     category: HabitCategory
     target_frequency: TargetFrequency
@@ -63,6 +64,7 @@ class HabitInDB(HabitBase):
         }
 
 class DailyLogBase(BaseModel):
+    user_id: Optional[str] = None
     habit_id: str
     date: str  # Format: YYYY-MM-DD
     status: bool  # True if habit completed (or 0 outbursts for negative habits)
@@ -89,6 +91,7 @@ class DailyLogInDB(DailyLogBase):
         }
 
 class ExpenseBase(BaseModel):
+    user_id: Optional[str] = None
     date: str
     desc: str
     amount: float
@@ -105,6 +108,7 @@ class ExpenseInDB(ExpenseBase):
         populate_by_name = True
 
 class DebtBase(BaseModel):
+    user_id: Optional[str] = None
     person: str
     amount: float
     desc: str
@@ -119,3 +123,23 @@ class DebtInDB(DebtBase):
 
     class Config:
         populate_by_name = True
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    created_at: datetime
+
+    class Config:
+        populate_by_name = True
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+

@@ -20,6 +20,8 @@ habits_collection = db["habits"]
 logs_collection = db["logs"]
 expenses_collection = db["expenses"]
 debts_collection = db["debts"]
+users_collection = db["users"]
+refresh_tokens_collection = db["refresh_tokens"]
 
 async def check_db_connection():
     try:

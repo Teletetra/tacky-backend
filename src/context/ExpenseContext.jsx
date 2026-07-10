@@ -1,5 +1,7 @@
 import { createContext, useContext, useReducer, useEffect } from 'react';
 import { initialExpenses, CATEGORIES } from '../data/initialExpenses';
+import { apiFetch } from '../utils/auth';
+import { useAuth } from './AuthContext';
 
 const ExpenseContext = createContext(null);
 
@@ -38,21 +40,29 @@ export function ExpenseProvider({ children }) {
     categories: JSON.parse(localStorage.getItem('kharcha-categories')) || CATEGORIES,
     debts: [], // Loaded from DB
     activeTab: 'dashboard',
-    theme: localStorage.getItem('kharcha-theme') || 'white',
+    theme: localStorage.getItem('kharcha-theme') || 'purple',
   });
 
-  // Fetch initial data from MongoDB via FastAPI
+  const { user } = useAuth();
+
+  // Fetch initial data from MongoDB via FastAPI when user state changes
   useEffect(() => {
-    fetch(`${API_BASE}/expenses`)
-      .then(res => res.json())
+    if (!user) {
+      dispatch({ type: 'SET_EXPENSES', payload: [] });
+      dispatch({ type: 'SET_DEBTS', payload: [] });
+      return;
+    }
+
+    apiFetch(`${API_BASE}/expenses`)
+      .then(res => res.ok ? res.json() : [])
       .then(data => dispatch({ type: 'SET_EXPENSES', payload: data }))
       .catch(err => console.error("Error fetching expenses:", err));
 
-    fetch(`${API_BASE}/debts`)
-      .then(res => res.json())
+    apiFetch(`${API_BASE}/debts`)
+      .then(res => res.ok ? res.json() : [])
       .then(data => dispatch({ type: 'SET_DEBTS', payload: data }))
       .catch(err => console.error("Error fetching debts:", err));
-  }, []);
+  }, [user]);
 
   // Sync remaining local config to localStorage
   useEffect(() => {
@@ -66,7 +76,7 @@ export function ExpenseProvider({ children }) {
   // Async Actions mapped to Backend
   const addExpense = async (expense) => {
     try {
-      const res = await fetch(`${API_BASE}/expenses`, {
+      const res = await apiFetch(`${API_BASE}/expenses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expense)
@@ -80,7 +90,7 @@ export function ExpenseProvider({ children }) {
 
   const deleteExpense = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/expenses/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API_BASE}/expenses/${id}`, { method: 'DELETE' });
       if (res.ok) {
         dispatch({ type: 'DELETE', id });
       }
@@ -89,7 +99,7 @@ export function ExpenseProvider({ children }) {
 
   const editExpense = async (expense) => {
     try {
-      const res = await fetch(`${API_BASE}/expenses/${expense.id}`, {
+      const res = await apiFetch(`${API_BASE}/expenses/${expense.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(expense)
@@ -105,7 +115,7 @@ export function ExpenseProvider({ children }) {
 
   const addDebt = async (debt) => {
     try {
-      const res = await fetch(`${API_BASE}/debts`, {
+      const res = await apiFetch(`${API_BASE}/debts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(debt)
@@ -119,7 +129,7 @@ export function ExpenseProvider({ children }) {
 
   const deleteDebt = async (id) => {
     try {
-      const res = await fetch(`${API_BASE}/debts/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`${API_BASE}/debts/${id}`, { method: 'DELETE' });
       if (res.ok) {
         dispatch({ type: 'DELETE_DEBT', id });
       }
@@ -130,7 +140,7 @@ export function ExpenseProvider({ children }) {
     try {
       const debt = state.debts.find(d => d.id === id);
       if (!debt) return;
-      const res = await fetch(`${API_BASE}/debts/${id}`, {
+      const res = await apiFetch(`${API_BASE}/debts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...debt, isPaid: !debt.isPaid })
