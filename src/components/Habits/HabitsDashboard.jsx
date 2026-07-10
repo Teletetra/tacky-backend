@@ -29,6 +29,7 @@ const CATEGORY_ICONS = {
   Technical: '💻',
   Spiritual: '🧘',
 };
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export default function HabitsDashboard() {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
@@ -52,6 +53,12 @@ export default function HabitsDashboard() {
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [selectedCalendarDateStr, setSelectedCalendarDateStr] = useState(null);
+
+  // Calendar View State
+  const [calendarViewMonth, setCalendarViewMonth] = useState(new Date().getMonth());
+  const [calendarViewYear, setCalendarViewYear] = useState(new Date().getFullYear());
+  const [selectedCalendarViewDateStr, setSelectedCalendarViewDateStr] = useState(getLocalDateString());
+  const [calendarLogs, setCalendarLogs] = useState([]);
 
   const fetchHabits = useCallback(async () => {
     try {
@@ -81,6 +88,20 @@ export default function HabitsDashboard() {
     }
   }, [selectedDate]);
 
+  const fetchCalendarLogs = useCallback(async () => {
+    const start = `${calendarViewYear}-${String(calendarViewMonth + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
+    const end = `${calendarViewYear}-${String(calendarViewMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    try {
+      const res = await apiFetch(`${API_BASE}/logs?start_date=${start}&end_date=${end}`);
+      if (res.ok) {
+        setCalendarLogs(await res.json());
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, [calendarViewMonth, calendarViewYear]);
+
   useEffect(() => {
     fetchHabits();
     const interval = setInterval(fetchHabits, 60000);
@@ -90,8 +111,10 @@ export default function HabitsDashboard() {
   useEffect(() => {
     if (activeView === 'analytics') {
       fetchAnalytics();
+    } else if (activeView === 'calendar') {
+      fetchCalendarLogs();
     }
-  }, [activeView, fetchAnalytics]);
+  }, [activeView, fetchAnalytics, fetchCalendarLogs]);
 
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
@@ -111,6 +134,7 @@ export default function HabitsDashboard() {
       await apiFetch(`${API_BASE}/habits/${habitId}`, { method: 'DELETE' });
       fetchHabits();
       if (activeView === 'analytics') fetchAnalytics();
+      if (activeView === 'calendar') fetchCalendarLogs();
     } catch (err) {
       console.error(err);
     }
@@ -172,6 +196,12 @@ export default function HabitsDashboard() {
             onClick={() => setActiveView('analytics')}
           >
             📊 Analytics
+          </button>
+          <button 
+            className={`${styles.toggleBtn} ${activeView === 'calendar' ? styles.activeToggle : ''}`}
+            onClick={() => setActiveView('calendar')}
+          >
+            📅 Calendar View
           </button>
         </div>
 
@@ -244,7 +274,7 @@ export default function HabitsDashboard() {
             ))
           )}
         </section>
-      ) : (
+      ) : activeView === 'analytics' ? (
         <section className={styles.analyticsSection}>
           {/* Global Completion Area Chart */}
           <div className={styles.globalChartCard}>
@@ -355,16 +385,198 @@ export default function HabitsDashboard() {
             )}
           </div>
         </section>
+      ) : (
+        <section className={styles.calendarViewSection}>
+          <div className={styles.calendarColumn}>
+            <div className={styles.monthNav}>
+              <button onClick={() => {
+                if (calendarViewMonth === 0) {
+                  setCalendarViewMonth(11);
+                  setCalendarViewYear(calendarViewYear - 1);
+                } else {
+                  setCalendarViewMonth(calendarViewMonth - 1);
+                }
+              }}>◀</button>
+              <strong className={styles.monthNavTitle}>
+                {monthNames[calendarViewMonth]} {calendarViewYear}
+              </strong>
+              <button onClick={() => {
+                if (calendarViewMonth === 11) {
+                  setCalendarViewMonth(0);
+                  setCalendarViewYear(calendarViewYear + 1);
+                } else {
+                  setCalendarViewMonth(calendarViewMonth + 1);
+                }
+              }}>▶</button>
+            </div>
+
+            <div className={styles.calGridHeaders}>
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(w => (
+                <div key={w}>{w}</div>
+              ))}
+            </div>
+
+            <div className={styles.calGridCells}>
+              {(() => {
+                const firstDayIdx = new Date(calendarViewYear, calendarViewMonth, 1).getDay();
+                const totalDaysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
+                const cells = [];
+
+                for (let i = 0; i < firstDayIdx; i++) {
+                  cells.push(<div key={`empty-${i}`} className={styles.calCellEmpty}></div>);
+                }
+
+                for (let d = 1; d <= totalDaysInMonth; d++) {
+                  const mPad = String(calendarViewMonth + 1).padStart(2, '0');
+                  const dPad = String(d).padStart(2, '0');
+                  const dateStr = `${calendarViewYear}-${mPad}-${dPad}`;
+                  
+                  // Filter logs for this day
+                  const dayLogs = calendarLogs.filter(l => l.date === dateStr);
+                  
+                  // Completions calculation
+                  const total = habits.length;
+                  const completed = dayLogs.filter(l => l.status === true).length;
+                  
+                  let heatClass = styles.heatCell0;
+                  if (total > 0 && completed > 0) {
+                    const ratio = completed / total;
+                    if (ratio === 1) heatClass = styles.heatCellHigh;
+                    else if (ratio >= 0.5) heatClass = styles.heatCellMed;
+                    else heatClass = styles.heatCellLow;
+                  }
+
+                  const isToday = dateStr === getLocalDateString();
+                  const isSelected = dateStr === selectedCalendarViewDateStr;
+
+                  cells.push(
+                    <div
+                      key={dateStr}
+                      onClick={() => setSelectedCalendarViewDateStr(dateStr)}
+                      className={`${styles.heatCell} ${heatClass} ${isToday ? styles.heatCellToday : ''} ${isSelected ? styles.heatCellSelected : ''}`}
+                    >
+                      <span className={styles.cellNum}>{d}</span>
+                      
+                      <div className={styles.cellDots}>
+                        {habits.map(habit => {
+                          const log = dayLogs.find(l => l.habit_id === habit.id);
+                          return (
+                            <span 
+                              key={habit.id} 
+                              className={`${styles.cellDot} ${log?.status ? styles.cellDotCompleted : ''}`}
+                              title={habit.name}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+                return cells;
+              })()}
+            </div>
+          </div>
+
+          <div className={styles.detailsColumn}>
+            {(() => {
+              const displayDate = new Date(selectedCalendarViewDateStr);
+              const formattedDateStr = isNaN(displayDate.getTime()) 
+                ? selectedCalendarViewDateStr 
+                : displayDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+              
+              const dayLogs = calendarLogs.filter(l => l.date === selectedCalendarViewDateStr);
+              
+              return (
+                <>
+                  <div className={styles.detailHeader}>
+                    <h3 className={styles.detailTitle}>{formattedDateStr}</h3>
+                    <div className={styles.detailSubtitle}>
+                      {dayLogs.filter(l => l.status === true).length} of {habits.length} habits completed
+                    </div>
+                  </div>
+
+                  <div className={styles.detailList}>
+                    {habits.length === 0 ? (
+                      <div className={styles.emptyState}>No habits registered. Add habits in the List View first!</div>
+                    ) : (
+                      habits.map(habit => {
+                        const log = dayLogs.find(l => l.habit_id === habit.id);
+                        const isDone = log?.status === true;
+                        
+                        let statusText = isDone ? 'Completed' : 'No Log';
+                        let detailMetricsText = '';
+                        
+                        if (isDone) {
+                          if (habit.tracking_type === 'workout') {
+                            detailMetricsText = `🏋️ Weight: ${log.weight || 0}kg | Reps: ${log.reps || 0}`;
+                          } else if (habit.tracking_type === 'timer') {
+                            detailMetricsText = `⏱️ Time spent: ${log.time_spent_minutes || 0} mins`;
+                          } else if (habit.tracking_type === 'counter') {
+                            detailMetricsText = `🔢 Chapter/Count: ${log.chapter || 0}`;
+                          } else if (habit.tracking_type === 'negative') {
+                            statusText = log.negative_count > 0 ? `${log.negative_count} outburst(s)` : '0 Outbursts ✓';
+                          }
+                        }
+
+                        return (
+                          <div key={habit.id} className={styles.detailHabitRow}>
+                            <div className={styles.detailHabitMain}>
+                              <div className={styles.detailBadgeRow}>
+                                <span className={styles.detailHabitName}>{habit.name}</span>
+                                <span className={isDone ? styles.badgeSuccessCompact : styles.badgeFailCompact}>
+                                  {statusText}
+                                </span>
+                              </div>
+                              <button 
+                                className={`${styles.detailCheckinBtn} ${isDone ? styles.detailCheckinBtnSuccess : ''}`}
+                                onClick={() => {
+                                  setSelectedHabit(habit);
+                                  setSelectedDate(selectedCalendarViewDateStr);
+                                  setShowCheckinModal(true);
+                                }}
+                              >
+                                {isDone ? '✏️ Edit Log' : '✏️ Log'}
+                              </button>
+                            </div>
+                            
+                            {isDone && (
+                              <div className={styles.detailHabitMetrics}>
+                                {detailMetricsText && <div>{detailMetricsText}</div>}
+                                {log.notes && <div className={styles.detailHabitNote}>Note: {log.notes}</div>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </section>
       )}
 
       {/* Modals */}
-      {showAddModal && <AddHabitModal onClose={() => setShowAddModal(false)} onRefresh={fetchHabits} />}
+      {showAddModal && (
+        <AddHabitModal 
+          onClose={() => setShowAddModal(false)} 
+          onRefresh={() => {
+            fetchHabits();
+            if (activeView === 'calendar') fetchCalendarLogs();
+          }} 
+        />
+      )}
       {showCheckinModal && selectedHabit && (
         <CheckInModal 
           habit={selectedHabit} 
           date={selectedDate}
           onClose={() => setShowCheckinModal(false)} 
-          onRefresh={fetchHabits} 
+          onRefresh={() => {
+            fetchHabits();
+            if (activeView === 'calendar') fetchCalendarLogs();
+            if (activeView === 'analytics') fetchAnalytics();
+          }} 
         />
       )}
       {showHistoryModal && selectedHabit && (
@@ -619,8 +831,6 @@ function CheckInModal({ habit, date, onClose, onRefresh }) {
 }
 
 function HistoryModal({ habit, logs, month, year, setMonth, setYear, selectedDateStr, setSelectedDateStr, onClose }) {
-  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  
   const handlePrev = () => {
     if (month === 0) { setMonth(11); setYear(year - 1); }
     else setMonth(month - 1);

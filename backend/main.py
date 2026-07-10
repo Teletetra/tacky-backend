@@ -485,6 +485,28 @@ async def delete_habit(habit_id: str, current_user: dict = Depends(get_current_u
     await logs_collection.delete_many({"user_id": current_user["_id"], "habit_id": habit_id})
     return {"message": "Habit and associated logs deleted successfully"}
 
+@app.get("/api/logs")
+async def get_all_logs(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user)
+):
+    query = {"user_id": current_user["_id"]}
+    if start_date or end_date:
+        date_query = {}
+        if start_date:
+            date_query["$gte"] = start_date
+        if end_date:
+            date_query["$lte"] = end_date
+        query["date"] = date_query
+        
+    logs = []
+    cursor = logs_collection.find(query)
+    async for doc in cursor:
+        doc["id"] = doc["_id"]
+        logs.append(doc)
+    return logs
+
 @app.get("/api/habits/{habit_id}/logs")
 async def get_habit_logs(habit_id: str, current_user: dict = Depends(get_current_user)):
     # Verify ownership of habit first

@@ -34,7 +34,7 @@ export default function Debts() {
 
   const handleSettleDebt = (debt) => {
     toggleDebtPaid(debt.id);
-    
+
     // If we are marking it paid, add an expense transaction
     if (!debt.isPaid) {
       addExpense({
@@ -86,7 +86,7 @@ export default function Debts() {
               <input
                 type="text"
                 className={styles.input}
-                placeholder="e.g. Negi, Prankur, Kartik"
+                placeholder="e.g. "
                 value={form.person}
                 onChange={set('person')}
                 required

@@ -7,6 +7,7 @@
   --text-primary: #111827;
   --text-secondary: #6b7280;
   --accent-color: #378ADD;
+  --accent-rgb: 55, 138, 221;
   --accent-hover: #256cb5;
   --card-bg: #ffffff;
   --input-bg: #ffffff;
@@ -22,6 +23,7 @@
   --text-primary: #f9fafb;
   --text-secondary: #9ca3af;
   --accent-color: #3b82f6;
+  --accent-rgb: 59, 130, 246;
   --accent-hover: #60a5fa;
   --card-bg: #111a2e;
   --input-bg: #0b0f19;
@@ -37,6 +39,7 @@
   --text-primary: #f5efff;
   --text-secondary: #b39ddb;
   --accent-color: #a855f7;
+  --accent-rgb: 168, 85, 247;
   --accent-hover: #c084fc;
   --card-bg: #1a0e2b;
   --input-bg: #12091f;
