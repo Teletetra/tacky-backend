@@ -6,8 +6,8 @@ import styles from './Debts.module.css';
 const today = new Date().toISOString().split('T')[0];
 
 export default function Debts() {
-  const { debts, addDebt, deleteDebt, toggleDebtPaid, addExpense } = useExpenses();
-  const [form, setForm] = useState({ person: '', amount: '', desc: '', date: today });
+  const { debts, addDebt, deleteDebt, toggleDebtPaid } = useExpenses();
+  const [form, setForm] = useState({ person: '', amount: '', desc: '', date: today, type: 'borrowed' });
   const [msg, setMsg] = useState(null);
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
@@ -24,49 +24,48 @@ export default function Debts() {
       amount: parseFloat(form.amount),
       desc: form.desc.trim(),
       date: form.date,
+      type: form.type,
       isPaid: false,
     });
 
-    setForm({ person: '', amount: '', desc: '', date: today });
-    setMsg({ type: 'success', text: 'Debt added successfully!' });
+    setForm({ person: '', amount: '', desc: '', date: today, type: form.type });
+    setMsg({ type: 'success', text: 'Debt record added successfully!' });
     setTimeout(() => setMsg(null), 2000);
   };
 
   const handleSettleDebt = (debt) => {
     toggleDebtPaid(debt.id);
-
-    // If we are marking it paid, add an expense transaction
-    if (!debt.isPaid) {
-      addExpense({
-        date: new Date().toISOString().split('T')[0],
-        amount: debt.amount,
-        desc: `Settled Debt: ${debt.person} (${debt.desc})`,
-        cat: 'transfer',
-        type: 'expense',
-      });
-      setMsg({ type: 'success', text: `Settled debt and logged transfer expense of ${formatINR(debt.amount)}!` });
-      setTimeout(() => setMsg(null), 3000);
-    }
+    setMsg({ type: 'success', text: debt.isPaid ? 'Debt marked as active!' : 'Debt marked as settled!' });
+    setTimeout(() => setMsg(null), 2000);
   };
 
   // Metrics
   const pendingDebts = debts.filter(d => !d.isPaid);
   const settledDebts = debts.filter(d => d.isPaid);
 
-  const totalOutstanding = pendingDebts.reduce((sum, d) => sum + d.amount, 0);
+  const pendingBorrowed = pendingDebts.filter(d => d.type === 'borrowed' || !d.type);
+  const pendingLent = pendingDebts.filter(d => d.type === 'lent');
+
+  const totalBorrowedOutstanding = pendingBorrowed.reduce((sum, d) => sum + d.amount, 0);
+  const totalLentOutstanding = pendingLent.reduce((sum, d) => sum + d.amount, 0);
   const totalSettled = settledDebts.reduce((sum, d) => sum + d.amount, 0);
 
   return (
     <div className={styles.page}>
       <h2 className={styles.pageTitle}>🤝 Debts Tracker</h2>
-      <p className={styles.pageSub}>Manage money you owe to others ("Money to Give")</p>
+      <p className={styles.pageSub}>Manage money you owe to others and money others owe to you</p>
 
       {/* Debt Metrics Grid */}
       <div className={styles.metricsGrid}>
-        <div className={`${styles.metricCard} ${styles.outstandingCard}`}>
-          <span className={styles.metricLabel}>Total Outstanding</span>
-          <span className={styles.metricValue}>{formatINR(totalOutstanding)}</span>
-          <p className={styles.metricSub}>{pendingDebts.length} active bills</p>
+        <div className={`${styles.metricCard} ${styles.outstandingBorrowedCard}`}>
+          <span className={styles.metricLabel}>You Owe (Taken)</span>
+          <span className={styles.metricValue}>{formatINR(totalBorrowedOutstanding)}</span>
+          <p className={styles.metricSub}>{pendingBorrowed.length} active liabilities</p>
+        </div>
+        <div className={`${styles.metricCard} ${styles.outstandingLentCard}`}>
+          <span className={styles.metricLabel}>Owed to You (Given)</span>
+          <span className={styles.metricValue}>{formatINR(totalLentOutstanding)}</span>
+          <p className={styles.metricSub}>{pendingLent.length} active assets</p>
         </div>
         <div className={`${styles.metricCard} ${styles.settledCard}`}>
           <span className={styles.metricLabel}>Total Settled</span>
@@ -79,14 +78,37 @@ export default function Debts() {
       <div className={styles.mainGrid}>
         {/* Form Card */}
         <div className={styles.formCard}>
-          <h3 className={styles.formHeading}>Record New Borrowing</h3>
+          <h3 className={styles.formHeading}>
+            {form.type === 'borrowed' ? 'Record New Borrowing' : 'Record New Lending'}
+          </h3>
           <form onSubmit={handleSubmit} className={styles.form}>
             <div className={styles.field}>
-              <label className={styles.label}>Who did you borrow from?</label>
+              <label className={styles.label}>Transaction Type</label>
+              <div className={styles.typeSelector}>
+                <button
+                  type="button"
+                  className={`${styles.typeBtn} ${form.type === 'borrowed' ? styles.typeBtnActiveBorrowed : ''}`}
+                  onClick={() => setForm(f => ({ ...f, type: 'borrowed' }))}
+                >
+                  📥 Took (Borrowed)
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.typeBtn} ${form.type === 'lent' ? styles.typeBtnActiveLent : ''}`}
+                  onClick={() => setForm(f => ({ ...f, type: 'lent' }))}
+                >
+                  📤 Gave (Lent)
+                </button>
+              </div>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>
+                {form.type === 'borrowed' ? 'Who did you borrow from?' : 'Who did you lend to?'}
+              </label>
               <input
                 type="text"
                 className={styles.input}
-                placeholder="e.g. "
+                placeholder={form.type === 'borrowed' ? 'e.g. Rahul, Bank' : 'e.g. Amit, Priya'}
                 value={form.person}
                 onChange={set('person')}
                 required
@@ -124,7 +146,9 @@ export default function Debts() {
                 required
               />
             </div>
-            <button type="submit" className={styles.submitBtn}>Add Debt</button>
+            <button type="submit" className={styles.submitBtn}>
+              {form.type === 'borrowed' ? 'Add Borrowed Debt' : 'Add Lent Debt'}
+            </button>
           </form>
           {msg && (
             <p className={`${styles.msg} ${msg.type === 'error' ? styles.error : styles.success}`}>
@@ -139,18 +163,25 @@ export default function Debts() {
           <div className={styles.listSection}>
             <h4 className={styles.sectionTitle}>⚠️ Active Debts ({pendingDebts.length})</h4>
             {pendingDebts.length === 0 ? (
-              <p className={styles.emptyListText}>No outstanding debts! You are debt free. 🎉</p>
+              <p className={styles.emptyListText}>No outstanding debts! You are all clear. 🎉</p>
             ) : (
               <div className={styles.debtsList}>
                 {pendingDebts.map(d => (
                   <div key={d.id} className={styles.debtRow}>
                     <div className={styles.debtInfo}>
-                      <span className={styles.personName}>{d.person}</span>
+                      <span className={styles.personName}>
+                        {d.person}
+                        <span className={`${styles.badge} ${d.type === 'lent' ? styles.badgeLent : styles.badgeBorrowed}`}>
+                          {d.type === 'lent' ? 'Gave' : 'Took'}
+                        </span>
+                      </span>
                       <span className={styles.debtDesc}>{d.desc}</span>
                       <span className={styles.debtDate}>{formatDate(d.date)}</span>
                     </div>
                     <div className={styles.debtActions}>
-                      <span className={styles.pendingAmount}>{formatINR(d.amount)}</span>
+                      <span className={styles.pendingAmount} style={{ color: d.type === 'lent' ? '#10b981' : '#f43f5e' }}>
+                        {formatINR(d.amount)}
+                      </span>
                       <button
                         className={styles.settleBtn}
                         onClick={() => handleSettleDebt(d)}
@@ -182,12 +213,19 @@ export default function Debts() {
                 {settledDebts.map(d => (
                   <div key={d.id} className={`${styles.debtRow} ${styles.settledRow}`}>
                     <div className={styles.debtInfo}>
-                      <span className={styles.personName}>{d.person}</span>
+                      <span className={styles.personName}>
+                        {d.person}
+                        <span className={`${styles.badge} ${d.type === 'lent' ? styles.badgeLent : styles.badgeBorrowed}`}>
+                          {d.type === 'lent' ? 'Gave' : 'Took'}
+                        </span>
+                      </span>
                       <span className={styles.debtDesc}>{d.desc}</span>
                       <span className={styles.debtDate}>{formatDate(d.date)}</span>
                     </div>
                     <div className={styles.debtActions}>
-                      <span className={styles.settledAmount}>{formatINR(d.amount)}</span>
+                      <span className={styles.settledAmount}>
+                        {formatINR(d.amount)}
+                      </span>
                       <button
                         className={styles.unsettleBtn}
                         onClick={() => toggleDebtPaid(d.id)}

@@ -1,2 +1,8 @@
 node_modules/
 mongodb_backup/
+.agents/
+backend/test_hosted_backend.py
+backend/.venv/
+.venv
+.env
+.flaskenv

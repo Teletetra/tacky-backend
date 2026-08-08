@@ -107,13 +107,19 @@ class ExpenseInDB(ExpenseBase):
     class Config:
         populate_by_name = True
 
+class DebtType(str, Enum):
+    BORROWED = "borrowed"
+    LENT = "lent"
+
 class DebtBase(BaseModel):
     user_id: Optional[str] = None
     person: str
     amount: float
     desc: str
     date: str
+    type: DebtType = DebtType.BORROWED
     isPaid: bool = False
+
 
 class DebtCreate(DebtBase):
     pass
